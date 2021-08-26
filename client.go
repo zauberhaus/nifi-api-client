@@ -1,3 +1,19 @@
+/*
+Copyright © 2021 Dirk Lembke
+
+Licensed under the Apache License, Version 2.0 (the "License");
+you may not use this file except in compliance with the License.
+You may obtain a copy of the License at
+
+    http://www.apache.org/licenses/LICENSE-2.0
+
+Unless required by applicable law or agreed to in writing, software
+distributed under the License is distributed on an "AS IS" BASIS,
+WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+See the License for the specific language governing permissions and
+limitations under the License.
+*/
+
 package nifi
 
 import (
@@ -75,9 +91,17 @@ func Login(server *url.URL, username string, password string, options ...interfa
 		}
 	}
 
+	noCache := false
+	if len(options) > 1 {
+		val, ok := options[1].(bool)
+		if ok {
+			noCache = val
+		}
+	}
+
 	status := &Status{}
 	err := status.Load("./token.yaml")
-	if err == nil && username == status.User &&
+	if !noCache && err == nil && username == status.User &&
 		(server == nil || server.String() == status.Server) &&
 		status.Expire.After(time.Now()) {
 
@@ -141,7 +165,9 @@ func Login(server *url.URL, username string, password string, options ...interfa
 		return nil, err
 	}
 
-	status.Save("./token.yaml")
+	if !noCache {
+		status.Save("./token.yaml")
+	}
 
 	rc := &Client{
 		client: client,
