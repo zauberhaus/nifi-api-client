@@ -1,80 +1,115 @@
 package nifi
 
 import (
+	"encoding/json"
 	"fmt"
-	"io"
+	"strconv"
+	"strings"
 )
 
-type Tree map[*Component]Tree
+func (c *Client) Tree(ids []string, types NiFiType) (Tree, error) {
+	tree := Tree{}
 
-func (t Tree) Add(c *Component) {
-	t[c] = Tree{}
+	for _, id := range ids {
+		t, err := c.tree(id, types, true, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		tree.Merge(t)
+
+	}
+
+	return tree, nil
 }
 
-func (t Tree) Merge(tree Tree) {
-	for k, v := range tree {
-		t[k] = v
+func (c *Client) tree(id string, types NiFiType, recursive bool, filter ComponentFilter) (Tree, error) {
+	data, err := c.Get(fmt.Sprintf("/flow/process-groups/%v/status", id),
+		"recursive="+strconv.FormatBool(recursive),
+	)
+
+	if err != nil {
+		return nil, err
 	}
 
+	var input map[string]interface{}
+	err = json.Unmarshal([]byte(data), &input)
+	if err != nil {
+		return nil, err
+	}
+
+	val, ok := input["processGroupStatus"]
+	if !ok {
+		return nil, ErrInvalidFormat
+	}
+
+	input, ok = val.(map[string]interface{})
+	if !ok {
+		return nil, ErrInvalidFormat
+	}
+
+	val, ok = input["aggregateSnapshot"]
+	if !ok {
+		return nil, ErrInvalidFormat
+	}
+
+	input, ok = val.(map[string]interface{})
+	if !ok {
+		return nil, ErrInvalidFormat
+	}
+
+	tree := Tree{}
+	err = c.loopTree("processGroupStatusSnapshots", tree, input, types, filter)
+	if err != nil {
+		return nil, err
+	}
+
+	return tree, nil
 }
 
-func (t Tree) Fprint(w io.Writer, root bool, padding string) {
-	if t == nil {
-		return
+func (c *Client) loopTree(name string, parent Tree, o map[string]interface{}, types NiFiType, filter ComponentFilter) error {
+	tree := Tree{}
+
+	if len(o) == 0 {
+		return nil
 	}
 
-	index := 0
-	for k, v := range t {
-		fmt.Fprintf(w, "%s%s\n", padding+getPadding(root, getBoxType(index, len(t))), k)
-		v.Fprint(w, false, padding+getPadding(root, getBoxTypeExternal(index, len(t))))
-		index++
-	}
-}
+	name = strings.Replace(name, "StatusSnapshots", "", -1)
+	name = strings.ToLower(name)
 
-type BoxType int
-
-const (
-	Regular BoxType = iota
-	Last
-	AfterLast
-	Between
-)
-
-func (boxType BoxType) String() string {
-	switch boxType {
-	case Regular:
-		return "\u251c\u2500" // ├
-	case Last:
-		return "\u2514\u2500" // └
-	case AfterLast:
-		return " "
-	case Between:
-		return "\u2502" // │
-	default:
-		panic("invalid box type")
-	}
-}
-
-func getBoxType(index int, len int) BoxType {
-	if index+1 == len {
-		return Last
-	} else if index+1 > len {
-		return AfterLast
-	}
-	return Regular
-}
-
-func getBoxTypeExternal(index int, len int) BoxType {
-	if index+1 == len {
-		return AfterLast
-	}
-	return Between
-}
-
-func getPadding(root bool, boxType BoxType) string {
-	if root {
-		return ""
+	component := NewComponent(name, "", o)
+	if component != nil {
+		if (component.Type & types) > 0 {
+			if filter == nil || filter(component) {
+				parent[component] = tree
+			}
+		}
 	}
 
-	return boxType.String() + " "
+	for k, v := range o {
+		if strings.HasSuffix(k, "StatusSnapshots") {
+			input, ok := v.([]interface{})
+			if !ok {
+				return ErrInvalidFormat
+			}
+
+			if len(input) > 0 {
+				for _, s := range input {
+
+					snapshot, err := c.getSnapshot(s)
+					if err != nil {
+						return err
+					}
+
+					err = c.loopTree(k, tree, snapshot, types, filter)
+					if err != nil {
+						return err
+					}
+				}
+			}
+		}
+
+	}
+
+	return nil
 }

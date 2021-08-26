@@ -50,7 +50,7 @@ func (a ByVersion) Less(i, j int) bool {
 func (c *Client) GetVersionControlInfo(id string) (*VersionControlInfo, *Revision, error) {
 	url := fmt.Sprintf("/versions/process-groups/%v", id)
 
-	response, err := c.call(Get, url, nil)
+	response, err := c.CallAPI(Get, url, nil)
 	if err != nil {
 		return nil, nil, err
 	}
@@ -77,7 +77,7 @@ func (c *Client) GetVersionControlInfo(id string) (*VersionControlInfo, *Revisio
 func (c *Client) GetVersions(registry string, bucket string, flow string) ([]ProcessGroupVersion, error) {
 	url := fmt.Sprintf("/flow/registries/%v/buckets/%v/flows/%v/versions", registry, bucket, flow)
 
-	response, err := c.call(Get, url, nil)
+	response, err := c.CallAPI(Get, url, nil)
 	if err != nil {
 		return nil, err
 	}
@@ -138,7 +138,7 @@ func (c *Client) SetVersion(versionInfo *VersionControlInfo, revision *Revision,
 		return nil, err
 	}
 
-	resp, err := c.call(Post, fmt.Sprintf("/versions/update-requests/process-groups/%v", versionInfo.GroupId), data)
+	resp, err := c.CallAPI(Post, fmt.Sprintf("/versions/update-requests/process-groups/%v", versionInfo.GroupId), data)
 	if err != nil {
 		return nil, err
 	}

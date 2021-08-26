@@ -20,10 +20,10 @@ type HttpClient struct {
 	client *http.Client
 }
 
-func NewLoginClient(file string, password string, insecureSkipVerify bool) (*HttpClient, error) {
+func NewHttpCertClient(file string, password string, insecureSkipVerify bool) (*HttpClient, error) {
 	rc := &HttpClient{}
 
-	client, err := rc.CreateClient(file, password, insecureSkipVerify)
+	client, err := rc.createClient(file, password, insecureSkipVerify)
 	if err != nil {
 		return nil, err
 	}
@@ -47,7 +47,7 @@ func NewHttpClient(insecureSkipVerify bool) (*HttpClient, error) {
 	return rc, nil
 }
 
-func (c *HttpClient) CreateClient(file string, password string, insecureSkipVerify bool) (*http.Client, error) {
+func (c *HttpClient) createClient(file string, password string, insecureSkipVerify bool) (*http.Client, error) {
 	cert, pool, err := c.ReadPKCS12(file, password)
 	if err != nil {
 		return nil, err
