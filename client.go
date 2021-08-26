@@ -57,8 +57,8 @@ type Client struct {
 
 type ComponentFilter func(*Component) bool
 
-func Connect(server *url.URL, certFile string, password string, insecureSkipVerify bool) (*Client, error) {
-	client, err := NewHttpCertClient(certFile, password, insecureSkipVerify)
+func Connect(server *url.URL, certFile string, password string, ca string, insecureSkipVerify bool) (*Client, error) {
+	client, err := NewHttpCertClient(certFile, password, ca, insecureSkipVerify)
 	if err != nil {
 		return nil, err
 	}

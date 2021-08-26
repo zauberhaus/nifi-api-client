@@ -24,6 +24,7 @@ import (
 	"crypto/rsa"
 	"crypto/tls"
 	"crypto/x509"
+	"encoding/pem"
 	"errors"
 	"fmt"
 	"io/ioutil"
@@ -36,10 +37,10 @@ type HttpClient struct {
 	client *http.Client
 }
 
-func NewHttpCertClient(file string, password string, insecureSkipVerify bool) (*HttpClient, error) {
+func NewHttpCertClient(file string, password string, ca string, insecureSkipVerify bool) (*HttpClient, error) {
 	rc := &HttpClient{}
 
-	client, err := rc.createClient(file, password, insecureSkipVerify)
+	client, err := rc.createClient(file, password, ca, insecureSkipVerify)
 	if err != nil {
 		return nil, err
 	}
@@ -63,10 +64,21 @@ func NewHttpClient(insecureSkipVerify bool) (*HttpClient, error) {
 	return rc, nil
 }
 
-func (c *HttpClient) createClient(file string, password string, insecureSkipVerify bool) (*http.Client, error) {
+func (c *HttpClient) createClient(file string, password string, ca string, insecureSkipVerify bool) (*http.Client, error) {
 	cert, pool, err := c.ReadPKCS12(file, password)
 	if err != nil {
 		return nil, err
+	}
+
+	if ca != "" {
+		certs, err := c.LoadPemCertificate(ca)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, cert := range certs {
+			pool.AddCert(cert)
+		}
 	}
 
 	transport := &http.Transport{
@@ -166,6 +178,37 @@ func (c *HttpClient) ReadPKCS12(file string, password string) (*tls.Certificate,
 	}
 
 	return tlsCert, pool, nil
+}
+
+func (c *HttpClient) LoadPemCertificate(path string) ([]*x509.Certificate, error) {
+	raw, err := ioutil.ReadFile(path)
+	if err != nil {
+		return nil, err
+	}
+
+	certs := []*x509.Certificate{}
+
+	for {
+		block, rest := pem.Decode(raw)
+		if block == nil {
+			break
+		}
+
+		if block.Type == "CERTIFICATE" {
+			cert, err := x509.ParseCertificate(block.Bytes)
+			if err != nil {
+				return nil, err
+			}
+
+			if cert.IsCA {
+				certs = append(certs, cert)
+			}
+		}
+
+		raw = rest
+	}
+
+	return certs, nil
 }
 
 func (c *HttpClient) Do(req *http.Request) (*http.Response, error) {
