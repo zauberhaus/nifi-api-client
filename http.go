@@ -49,11 +49,26 @@ func NewHttpCertClient(file string, password string, ca string, insecureSkipVeri
 	return rc, nil
 }
 
-func NewHttpClient(insecureSkipVerify bool) (*HttpClient, error) {
+func NewHttpClient(ca string, insecureSkipVerify bool) (*HttpClient, error) {
 	rc := &HttpClient{}
+	var pool *x509.CertPool
+
+	if ca != "" {
+		pool = x509.NewCertPool()
+
+		certs, err := rc.LoadPemCertificate(ca)
+		if err != nil {
+			return nil, err
+		}
+
+		for _, cert := range certs {
+			pool.AddCert(cert)
+		}
+	}
 
 	transport := &http.Transport{
 		TLSClientConfig: &tls.Config{
+			RootCAs:            pool,
 			InsecureSkipVerify: insecureSkipVerify,
 		},
 	}

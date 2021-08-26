@@ -30,14 +30,14 @@ import (
 )
 
 type Status struct {
-	User  string
-	Token string
-	//Cookies []*http.Cookie
+	User     string
+	Token    string
 	Cookies  map[string]string
 	Expire   time.Time
 	Aud      string
 	Insecure bool
 	Server   string
+	CA       string
 }
 
 type ByTime []time.Time
@@ -46,7 +46,7 @@ func (a ByTime) Len() int           { return len(a) }
 func (a ByTime) Swap(i, j int)      { a[i], a[j] = a[j], a[i] }
 func (a ByTime) Less(i, j int) bool { return a[i].Before(a[j]) }
 
-func NewStatus(server *url.URL, token string, cookies []*http.Cookie, insecure bool) (*Status, error) {
+func NewStatus(server *url.URL, token string, cookies []*http.Cookie, ca string, insecure bool) (*Status, error) {
 	var claims map[string]interface{}
 
 	result, err := jwt.ParseSigned(token)
@@ -68,6 +68,7 @@ func NewStatus(server *url.URL, token string, cookies []*http.Cookie, insecure b
 		Token:    token,
 		Cookies:  m,
 		Server:   server.String(),
+		CA:       ca,
 		Insecure: insecure,
 	}
 

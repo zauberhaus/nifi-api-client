@@ -82,7 +82,7 @@ func Connect(server *url.URL, certFile string, password string, ca string, insec
 	return rc, nil
 }
 
-func Login(server *url.URL, username string, password string, options ...interface{}) (*Client, error) {
+func Login(server *url.URL, username string, password string, ca string, options ...interface{}) (*Client, error) {
 	skip := false
 	if len(options) > 0 {
 		val, ok := options[0].(bool)
@@ -105,7 +105,7 @@ func Login(server *url.URL, username string, password string, options ...interfa
 		(server == nil || server.String() == status.Server) &&
 		status.Expire.After(time.Now()) {
 
-		client, err := NewHttpClient(status.Insecure)
+		client, err := NewHttpClient(status.CA, status.Insecure)
 		if err != nil {
 			return nil, err
 		}
@@ -127,7 +127,7 @@ func Login(server *url.URL, username string, password string, options ...interfa
 		}
 	}
 
-	client, err := NewHttpClient(skip)
+	client, err := NewHttpClient(ca, skip)
 	if err != nil {
 		return nil, err
 	}
@@ -160,7 +160,7 @@ func Login(server *url.URL, username string, password string, options ...interfa
 		return nil, fmt.Errorf("login: %v (%v)", string(token), response.Status)
 	}
 
-	status, err = NewStatus(server, string(token), response.Cookies(), skip)
+	status, err = NewStatus(server, string(token), response.Cookies(), ca, skip)
 	if err != nil {
 		return nil, err
 	}
